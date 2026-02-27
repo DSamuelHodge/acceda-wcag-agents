@@ -1,0 +1,30 @@
+{
+  "name": "acceda-agents",
+  "version": "0.1.0",
+  "description": "ACCEDA - Agentic Cloudflare Continuous Evaluation & Dynamic Accessibility. Three-mode WCAG agent: CI/CD, WebMCP, Sentinel.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env development",
+    "deploy:dev": "wrangler deploy --env development",
+    "deploy:prod": "wrangler deploy --env production",
+    "db:migrate": "wrangler d1 execute acceda-db --file=./infra/schema.sql",
+    "db:migrate:dev": "wrangler d1 execute acceda-db-dev --file=./infra/schema.sql --local",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.3",
+    "@cloudflare/agents": "^0.0.32",
+    "agents": "^0.0.32",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250224.0",
+    "@types/node": "^22.13.9",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7",
+    "wrangler": "^3.109.3"
+  }
+}

@@ -1,0 +1,144 @@
+name: ACCEDA CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── Type Check & Build ─────────────────────────────────────────────────
+  build:
+    name: Build & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+  # ── Deploy to Development ──────────────────────────────────────────────
+  deploy-dev:
+    name: Deploy → Development
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    environment: development
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run D1 migrations (dev)
+        run: npm run db:migrate:dev
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy Worker (dev)
+        run: npm run deploy:dev
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # ── Self-Audit on PR ───────────────────────────────────────────────────
+  # ACCEDA audits itself on every PR — dogfooding the CI mode
+  accessibility-audit:
+    name: ACCEDA Self-Audit
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Trigger ACCEDA audit
+        id: audit
+        run: |
+          RESPONSE=$(curl -s -X POST \
+            "https://acceda-agents-dev.workers.dev/api/audit" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "url": "${{ github.event.pull_request.html_url }}",
+              "mode": "ci",
+              "wcagLevel": "wcag2aa"
+            }')
+          echo "response=$RESPONSE" >> $GITHUB_OUTPUT
+          AUDIT_ID=$(echo $RESPONSE | jq -r '.auditId')
+          echo "audit_id=$AUDIT_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for audit completion
+        run: |
+          AUDIT_ID="${{ steps.audit.outputs.audit_id }}"
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s "https://acceda-agents-dev.workers.dev/api/audit/$AUDIT_ID" | jq -r '.session.status')
+            echo "Audit status: $STATUS (attempt $i/30)"
+            if [ "$STATUS" = "complete" ] || [ "$STATUS" = "failed" ]; then
+              break
+            fi
+            sleep 10
+          done
+
+      - name: Check for critical violations
+        run: |
+          AUDIT_ID="${{ steps.audit.outputs.audit_id }}"
+          RESULT=$(curl -s "https://acceda-agents-dev.workers.dev/api/audit/$AUDIT_ID")
+          CRITICAL=$(echo $RESULT | jq '[.violations[] | select(.impact == "critical")] | length')
+          echo "Critical violations: $CRITICAL"
+          if [ "$CRITICAL" -gt "0" ]; then
+            echo "::error::ACCEDA found $CRITICAL critical accessibility violations. Review the audit report."
+            exit 1
+          fi
+
+  # ── Deploy to Production ───────────────────────────────────────────────
+  deploy-prod:
+    name: Deploy → Production
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run D1 migrations (prod)
+        run: npm run db:migrate
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy Worker (production)
+        run: npm run deploy:prod
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Post deployment notification
+        run: |
+          echo "✅ ACCEDA Agents deployed to production"
+          echo "Worker: https://acceda-agents.workers.dev"
+          echo "Docs: https://acceda-agents.workers.dev/webmcp/tools"
