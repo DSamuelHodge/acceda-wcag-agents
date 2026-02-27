@@ -5,3 +5,6 @@ dist/
 .env.local
 *.local
 .DS_Store
+packages/*/node_modules/
+packages/*/dist/
+packages/*/.wrangler/
