@@ -170,6 +170,9 @@ export class AuditAgent extends Agent<Env> {
     await this.updateStatus('complete');
     this.broadcastStatus({ phase: 'complete', message: 'Audit complete.' });
 
+    // Close browser session — frees Browser Rendering resources
+    await this.closeBrowserSession(config.url);
+
     return this.result as AuditResult;
   }
 
@@ -320,17 +323,19 @@ export class AuditAgent extends Agent<Env> {
   }
 
   /**
-   * Abstracted Playwright MCP call.
-   * In production this calls the @cloudflare/playwright-mcp Worker binding.
-   * The binding manages a Container with Chromium for safe browser execution.
+   * Calls acceda-playwright-mcp Worker via Service binding.
+   * POST /tool  →  { tool, params }  →  { result }
+   *
+   * The Worker runs @cloudflare/playwright-mcp backed by Browser Rendering.
+   * Each unique URL gets its own Durable Object session — context isolation
+   * means concurrent audits never share browser state.
    */
   private async callPlaywrightMCP(
     tool: string,
     params: Record<string, unknown>,
   ): Promise<{ result: unknown }> {
-    // Route through the PLAYWRIGHT_MCP Worker Service binding
     const response = await this.env.PLAYWRIGHT_MCP.fetch(
-      new Request('https://playwright-mcp.internal/tool', {
+      new Request('https://acceda-playwright-mcp.internal/tool', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tool, params }),
@@ -338,10 +343,23 @@ export class AuditAgent extends Agent<Env> {
     );
 
     if (!response.ok) {
-      throw new Error(`Playwright MCP error: ${response.status} ${await response.text()}`);
+      const body = await response.text();
+      throw new Error(`Playwright MCP [${tool}] failed ${response.status}: ${body}`);
     }
 
     return response.json() as Promise<{ result: unknown }>;
+  }
+
+  /**
+   * Explicitly close the browser session for this URL after audit completes.
+   * Keeps Browser Rendering resource usage clean — DO hibernates after close.
+   */
+  private async closeBrowserSession(url: string): Promise<void> {
+    try {
+      await this.callPlaywrightMCP('close', { url });
+    } catch {
+      // Non-fatal — session will GC eventually
+    }
   }
 
   // ── WebSocket: Real-time progress streaming ───────────────────────────
