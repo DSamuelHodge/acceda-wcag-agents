@@ -2,6 +2,4 @@ node_modules/
 dist/
 .wrangler/
 .env
-.env.local
-*.local
-.DS_Store
+dist/
