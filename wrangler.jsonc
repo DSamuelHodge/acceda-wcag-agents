@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
   "name": "acceda-agents",
   "main": "src/index.ts",
-  "compatibility_date": "2025-02-01",
+  "compatibility_date": "2026-02-27",
   "compatibility_flags": ["nodejs_compat"],
 
   // ── Durable Objects ───────────────────────────────────────────────────────
@@ -73,7 +73,8 @@
   ],
 
   // ── External MCP Tool Bindings ────────────────────────────────────────────
-  // These declare outbound Worker Service bindings to MCP servers
+  // AuditAgent calls POST /tool on this Worker via Service binding.
+  // Deploy acceda-playwright-mcp first, then this binding resolves automatically.
   "services": [
     {
       "binding": "PLAYWRIGHT_MCP",

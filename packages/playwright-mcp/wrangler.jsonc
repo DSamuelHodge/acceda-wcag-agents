@@ -1,0 +1,54 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+
+  "name": "acceda-playwright-mcp",
+  "main": "src/index.ts",
+
+  // ── Must be >= 2025-09-15 per @cloudflare/playwright-mcp docs ────────────
+  "compatibility_date": "2026-02-27",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // ── Browser Rendering binding ─────────────────────────────────────────────
+  // Provides authenticated Chromium endpoint to Playwright
+  "browser": {
+    "binding": "BROWSER"
+  },
+
+  // ── Durable Object for PlaywrightMCP session management ──────────────────
+  // createMcpAgent() returns a class that must be a DO with SQLite storage
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MCP_OBJECT",
+        "class_name": "PlaywrightMCP"
+      }
+    ]
+  },
+
+  // ── DO migration — new_sqlite_classes is required ─────────────────────────
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PlaywrightMCP"]
+    }
+  ],
+
+  // ── Vars ──────────────────────────────────────────────────────────────────
+  "vars": {
+    "ENVIRONMENT": "production",
+    "MAX_CONCURRENT_SESSIONS": "10",
+    "SESSION_TIMEOUT_MS": "30000"
+  },
+
+  // ── Production environment ────────────────────────────────────────────────
+  "env": {
+    "production": {
+      "name": "acceda-playwright-mcp",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "MAX_CONCURRENT_SESSIONS": "20",
+        "SESSION_TIMEOUT_MS": "30000"
+      }
+    }
+  }
+}

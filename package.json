@@ -4,10 +4,15 @@
   "description": "ACCEDA - Agentic Cloudflare Continuous Evaluation & Dynamic Accessibility. Three-mode WCAG agent: CI/CD, WebMCP, Sentinel.",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/playwright-mcp"
+  ],
   "scripts": {
     "dev": "wrangler dev --env development",
     "deploy:dev": "wrangler deploy --env development",
     "deploy:prod": "wrangler deploy --env production",
+    "deploy:playwright-mcp": "cd packages/playwright-mcp && npm run deploy",
+    "deploy:all": "npm run deploy:playwright-mcp && npm run deploy:prod",
     "db:migrate": "wrangler d1 execute acceda-db --file=./infra/schema.sql",
     "db:migrate:dev": "wrangler d1 execute acceda-db-dev --file=./infra/schema.sql --local",
     "type-check": "tsc --noEmit",
