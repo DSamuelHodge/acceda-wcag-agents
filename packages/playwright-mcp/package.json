@@ -1,20 +1,20 @@
 {
   "name": "acceda-playwright-mcp",
   "version": "0.1.0",
-  "description": "ACCEDA Playwright MCP Worker — Browser Rendering service binding for AuditAgent",
+  "description": "ACCEDA Playwright MCP Worker — Browser Rendering for AuditAgent browser execution",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "deploy:prod": "wrangler deploy --env production",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@cloudflare/playwright-mcp": "^0.1.0"
+    "@cloudflare/playwright-mcp": "^0.0.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250224.0",
+    "@types/node": "^25.3.2",
     "typescript": "^5.7.3",
     "wrangler": "^3.109.3"
   }
